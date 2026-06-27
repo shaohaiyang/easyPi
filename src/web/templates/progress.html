@@ -97,21 +97,40 @@
         let soothingIdx = 0;
         let done = false;
 
-        // 前端保护：15 秒无任何进度更新则提示
-        let stallTimer = setTimeout(() => {
+        // 空闲超时：LLM 正在思考时不打断，但 30 秒无进度给个温柔提示
+        let stallWarnTimer = setTimeout(() => {
             if (!done) {
                 document.getElementById("stage-message").textContent = "规划耗时较长，请耐心等待…";
                 document.getElementById("soothing-text").textContent = "有时候好的行程需要更多思考 🤔";
             }
-        }, 15000);
+        }, 30000);
 
-        // 前端保护：90 秒总超时
-        let totalTimer = setTimeout(() => {
+        // 空闲超时：120 秒无任何进度才判定为真的超时
+        // 注意：只要后端持续推进度事件，这个计时器就会不断重置
+        let stallFailTimer = setTimeout(() => {
             if (!done) {
                 evtSource.close();
-                showFail("规划耗时过长，请重试。如果问题持续，请检查网络连接。");
+                showFail("LLM 响应超时（120 秒无响应），请重试");
             }
-        }, 90000);
+        }, 120000);
+
+        function resetStallTimers() {
+            clearTimeout(stallWarnTimer);
+            clearTimeout(stallFailTimer);
+            if (done) return;
+            stallWarnTimer = setTimeout(() => {
+                if (!done) {
+                    document.getElementById("stage-message").textContent = "规划耗时较长，请耐心等待…";
+                    document.getElementById("soothing-text").textContent = "有时候好的行程需要更多思考 🤔";
+                }
+            }, 30000);
+            stallFailTimer = setTimeout(() => {
+                if (!done) {
+                    evtSource.close();
+                    showFail("LLM 响应超时（120 秒无响应），请重试");
+                }
+            }, 120000);
+        }
 
         function showFail(msg) {
             done = true;
@@ -140,8 +159,8 @@
             const data = JSON.parse(e.data);
 
             if (data.failed) {
-                clearTimeout(stallTimer);
-                clearTimeout(totalTimer);
+                clearTimeout(stallWarnTimer);
+                clearTimeout(stallFailTimer);
                 showFail(data.error || "规划出错，请重试");
                 return;
             }
@@ -149,8 +168,8 @@
             if (data.done) {
                 if (done) return;
                 done = true;
-                clearTimeout(stallTimer);
-                clearTimeout(totalTimer);
+                clearTimeout(stallWarnTimer);
+                clearTimeout(stallFailTimer);
                 evtSource.close();
 
                 document.getElementById("main-card").classList.add("hidden");
@@ -164,14 +183,8 @@
 
             if (done) return;
 
-            // 有进度更新，重置 stall 计时器
-            clearTimeout(stallTimer);
-            stallTimer = setTimeout(() => {
-                if (!done) {
-                    document.getElementById("stage-message").textContent = "规划耗时较长，请耐心等待…";
-                    document.getElementById("soothing-text").textContent = "有时候好的行程需要更多思考 🤔";
-                }
-            }, 15000);
+            // 有进度更新，重置空闲计时器（LLM 还在工作）
+            resetStallTimers();
 
             const s = stages[data.stage] || { icon: "⏳", label: data.stage };
 
@@ -189,6 +202,14 @@
             logContainer.appendChild(log);
             logContainer.scrollTop = logContainer.scrollHeight;
         };
+
+        // 如果 5 秒后还没收到任何进度事件，开始轮播安慰话术
+        setTimeout(() => {
+            if (!done && soothingIdx === 0) {
+                document.getElementById("soothing-text").textContent =
+                    soothing[++soothingIdx % soothing.length];
+            }
+        }, 5000);
 
         evtSource.onerror = function() {
             if (!done) {

@@ -76,18 +76,13 @@ async def plan_progress(request: Request, plan_id: str):
     tracker = get_tracker(plan_id)
 
     async def event_generator():
-        # 前端最长等 120 秒，后端最长等 150 秒
-        deadline = asyncio.get_event_loop().time() + 150
+        # 不设总超时，改为"无进度空闲超时"：120 秒无任何进度事件则判定超时
+        # 每次 tracker._event 被 set 都会重置这个计时器
         while not tracker.done:
-            remaining = deadline - asyncio.get_event_loop().time()
-            if remaining <= 0:
-                yield f"data: {json.dumps({'failed': True, 'error': '规划超时，请重试'})}\n\n"
-                return
-
             try:
-                await asyncio.wait_for(tracker._event.wait(), timeout=remaining)
+                await asyncio.wait_for(tracker._event.wait(), timeout=120)
             except asyncio.TimeoutError:
-                yield f"data: {json.dumps({'failed': True, 'error': '规划超时，请重试'})}\n\n"
+                yield f"data: {json.dumps({'failed': True, 'error': 'LLM 响应超时（120 秒无响应），请重试'})}\n\n"
                 return
 
             tracker._event.clear()
