@@ -11,6 +11,8 @@ class ProgressTracker:
     message: str = ""
     pct: int = 0
     done: bool = False
+    failed: bool = False
+    error: str = ""
     result: object = None
     _event: asyncio.Event = field(default_factory=asyncio.Event)
 
@@ -18,6 +20,12 @@ class ProgressTracker:
         self.current_stage = stage
         self.message = message
         self.pct = pct
+        self._event.set()
+
+    def mark_failed(self, error: str):
+        self.failed = True
+        self.error = error
+        self.done = True
         self._event.set()
 
     def add_stage_result(self, agent: str, content: list | dict):

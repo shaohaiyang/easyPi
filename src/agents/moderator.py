@@ -37,6 +37,21 @@ async def create_plan(
     interests: str,
     tracker: ProgressTracker | None = None,
 ) -> PlanResult:
+    try:
+        return await _run_plan(destination, days, budget, interests, tracker)
+    except Exception as e:
+        if tracker:
+            tracker.mark_failed(str(e))
+        raise
+
+
+async def _run_plan(
+    destination: str,
+    days: int,
+    budget: float,
+    interests: str,
+    tracker: ProgressTracker | None = None,
+) -> PlanResult:
     if tracker:
         tracker.update("guide", f"🌏 导游正在规划 {destination} 的最佳路线…", 10)
 

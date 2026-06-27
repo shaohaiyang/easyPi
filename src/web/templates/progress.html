@@ -14,7 +14,9 @@
     </nav>
 
     <main class="max-w-2xl mx-auto px-6 py-12">
-        <div id="main-card" class="bg-white rounded-2xl shadow-lg p-8 text-center transition-colors duration-700">
+
+        <!-- 规划中 -->
+        <div id="main-card" class="bg-white rounded-2xl shadow-lg p-8 text-center">
             <h1 class="text-2xl font-bold text-gray-800 mb-2">
                 正在为你规划 <span class="text-blue-600">{{ destination }}</span> 之旅
             </h1>
@@ -33,7 +35,7 @@
             <div id="stage-log" class="mt-8 text-left space-y-2 max-h-[200px] overflow-y-auto"></div>
         </div>
 
-        <!-- 完成状态：初始隐藏 -->
+        <!-- 完成 -->
         <div id="done-card" class="hidden bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl shadow-lg p-12 text-center border-2 border-green-300 mt-6">
             <div class="text-7xl mb-6 animate-bounce">✅</div>
             <h2 class="text-3xl font-bold text-green-700 mb-3">行程规划完成！</h2>
@@ -42,26 +44,42 @@
                 <div class="w-16 h-16 border-4 border-green-300 border-t-green-600 rounded-full animate-spin"></div>
             </div>
         </div>
+
+        <!-- 失败 -->
+        <div id="fail-card" class="hidden bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl shadow-lg p-12 text-center border-2 border-red-300 mt-6">
+            <div class="text-7xl mb-6">😵</div>
+            <h2 class="text-2xl font-bold text-red-700 mb-3">规划遇到问题</h2>
+            <p id="fail-message" class="text-red-600 mb-8">请稍后重试</p>
+            <div class="flex gap-4 justify-center">
+                <a href="/" class="bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-300 transition">
+                    返回首页
+                </a>
+                <button onclick="retryPlan()" class="bg-red-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-red-600 transition shadow-md">
+                    重新规划
+                </button>
+            </div>
+        </div>
+
     </main>
 
     <style>
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-15px); }
-        }
-        .animate-bounce {
-            animation: bounce 0.8s ease-in-out infinite;
-        }
+        @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-15px)} }
+        .animate-bounce { animation: bounce 0.8s ease-in-out infinite; }
     </style>
 
     <script>
+        const planId = "{{ plan_id }}";
+        const destination = "{{ destination }}";
+        const days = {{ days }};
+        const budget = {{ budget }};
+        const interests = "{{ interests }}";
+
         const stages = {
             guide:     { icon: "🌏", label: "导游规划路线" },
             foodie:    { icon: "🍜", label: "美食家推荐美食" },
             local:     { icon: "🏘️", label: "本地通挖掘宝藏" },
             finance:   { icon: "💰", label: "财务官精打细算" },
             synthesizing: { icon: "🧠", label: "主持人综合整理" },
-            done:      { icon: "✅", label: "规划完成！" },
         };
 
         const soothing = [
@@ -75,17 +93,64 @@
             "马上就好，再等一下下…",
         ];
 
-        const evtSource = new EventSource("/plan/{{ plan_id }}/progress");
         const logContainer = document.getElementById("stage-log");
         let soothingIdx = 0;
         let done = false;
 
+        // 前端保护：15 秒无任何进度更新则提示
+        let stallTimer = setTimeout(() => {
+            if (!done) {
+                document.getElementById("stage-message").textContent = "规划耗时较长，请耐心等待…";
+                document.getElementById("soothing-text").textContent = "有时候好的行程需要更多思考 🤔";
+            }
+        }, 15000);
+
+        // 前端保护：90 秒总超时
+        let totalTimer = setTimeout(() => {
+            if (!done) {
+                evtSource.close();
+                showFail("规划耗时过长，请重试。如果问题持续，请检查网络连接。");
+            }
+        }, 90000);
+
+        function showFail(msg) {
+            done = true;
+            document.getElementById("main-card").classList.add("hidden");
+            document.getElementById("fail-message").textContent = msg;
+            document.getElementById("fail-card").classList.remove("hidden");
+        }
+
+        function retryPlan() {
+            const form = document.createElement("form");
+            form.method = "POST";
+            form.action = "/plan";
+            form.innerHTML = `
+                <input name="destination" value="${destination}">
+                <input name="days" value="${days}">
+                <input name="budget" value="${budget}">
+                <input name="interests" value="${interests}">
+            `;
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        const evtSource = new EventSource("/plan/" + planId + "/progress");
+
         evtSource.onmessage = function(e) {
             const data = JSON.parse(e.data);
+
+            if (data.failed) {
+                clearTimeout(stallTimer);
+                clearTimeout(totalTimer);
+                showFail(data.error || "规划出错，请重试");
+                return;
+            }
 
             if (data.done) {
                 if (done) return;
                 done = true;
+                clearTimeout(stallTimer);
+                clearTimeout(totalTimer);
                 evtSource.close();
 
                 document.getElementById("main-card").classList.add("hidden");
@@ -98,6 +163,15 @@
             }
 
             if (done) return;
+
+            // 有进度更新，重置 stall 计时器
+            clearTimeout(stallTimer);
+            stallTimer = setTimeout(() => {
+                if (!done) {
+                    document.getElementById("stage-message").textContent = "规划耗时较长，请耐心等待…";
+                    document.getElementById("soothing-text").textContent = "有时候好的行程需要更多思考 🤔";
+                }
+            }, 15000);
 
             const s = stages[data.stage] || { icon: "⏳", label: data.stage };
 
@@ -117,7 +191,10 @@
         };
 
         evtSource.onerror = function() {
-            document.getElementById("stage-message").textContent = "连接中断，正在重试…";
+            if (!done) {
+                document.getElementById("stage-message").textContent = "连接中断，正在重试…";
+                document.getElementById("soothing-text").textContent = "别担心，你的规划进度已保存 💾";
+            }
         };
     </script>
 </body>

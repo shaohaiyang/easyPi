@@ -76,9 +76,26 @@ async def plan_progress(request: Request, plan_id: str):
     tracker = get_tracker(plan_id)
 
     async def event_generator():
+        # 前端最长等 120 秒，后端最长等 150 秒
+        deadline = asyncio.get_event_loop().time() + 150
         while not tracker.done:
-            await tracker._event.wait()
+            remaining = deadline - asyncio.get_event_loop().time()
+            if remaining <= 0:
+                yield f"data: {json.dumps({'failed': True, 'error': '规划超时，请重试'})}\n\n"
+                return
+
+            try:
+                await asyncio.wait_for(tracker._event.wait(), timeout=remaining)
+            except asyncio.TimeoutError:
+                yield f"data: {json.dumps({'failed': True, 'error': '规划超时，请重试'})}\n\n"
+                return
+
             tracker._event.clear()
+
+            if tracker.failed:
+                yield f"data: {json.dumps({'failed': True, 'error': tracker.error})}\n\n"
+                return
+
             data = json.dumps(
                 {
                     "stage": tracker.current_stage,
@@ -88,6 +105,7 @@ async def plan_progress(request: Request, plan_id: str):
                 }
             )
             yield f"data: {data}\n\n"
+
         data = json.dumps({"done": True, "plan_id": plan_id})
         yield f"data: {data}\n\n"
 
