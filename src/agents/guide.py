@@ -1,13 +1,13 @@
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
-from src.config import GLM_API_KEY, GLM_MODEL_NAME, GLM_BASE_URL
+from src.config import VOLC_API_KEY, GLM_MODEL_NAME, VOLC_BASE_URL
 
 
 def create_guide_agent() -> Agent:
     model = OpenAIChatModel(
         GLM_MODEL_NAME,
-        provider=OpenAIProvider(base_url=GLM_BASE_URL, api_key=GLM_API_KEY),
+        provider=OpenAIProvider(base_url=VOLC_BASE_URL, api_key=VOLC_API_KEY),
     )
     return Agent(
         model,

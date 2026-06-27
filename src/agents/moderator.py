@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 
 from pydantic_ai import Agent, RunContext
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
+from src.config import VOLC_API_KEY, DEEPSEEK_MODEL, VOLC_BASE_URL
 from src.models.itinerary import DiscussionEntry, Itinerary, PlanResult
 
 from src.agents.guide import guide_agent
@@ -17,8 +20,13 @@ class TravelDeps:
     interests: str
 
 
+moderator_model = OpenAIChatModel(
+    DEEPSEEK_MODEL,
+    provider=OpenAIProvider(base_url=VOLC_BASE_URL, api_key=VOLC_API_KEY),
+)
+
 moderator_agent = Agent(
-    "deepseek:deepseek-chat",
+    moderator_model,
     deps_type=TravelDeps,
     output_type=PlanResult,
     instructions=(
