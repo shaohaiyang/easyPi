@@ -3,19 +3,27 @@ from pathlib import Path
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from jinja2 import Environment, FileSystemLoader
 
 from src.agents.moderator import create_plan
 
 router = APIRouter()
-templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+
+TEMPLATE_DIR = str(Path(__file__).parent / "templates")
+env = Environment(loader=FileSystemLoader(TEMPLATE_DIR), auto_reload=True)
 
 plans: dict[str, dict] = {}
 
 
+def render(name: str, **context) -> str:
+    template = env.get_template(name)
+    return template.render(**context)
+
+
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    html = render("index.html", request=request)
+    return HTMLResponse(html)
 
 
 @router.post("/plan")
@@ -34,41 +42,35 @@ async def plan(
         "budget": budget,
         "result": result,
     }
-    return templates.TemplateResponse(
-        "plan.html",
-        {"request": request, "plan_id": plan_id, "result": result},
-    )
+    html = render("plan.html", request=request, plan_id=plan_id, result=result)
+    return HTMLResponse(html)
 
 
 @router.get("/plan/{plan_id}", response_class=HTMLResponse)
 async def view_plan(request: Request, plan_id: str):
     plan_data = plans.get(plan_id)
     if not plan_data:
-        return templates.TemplateResponse(
-            "index.html", {"request": request, "error": "Plan not found"}
-        )
-    return templates.TemplateResponse(
+        html = render("index.html", request=request, error="Plan not found")
+        return HTMLResponse(html)
+    html = render(
         "plan.html",
-        {
-            "request": request,
-            "plan_id": plan_id,
-            "result": plan_data["result"],
-        },
+        request=request,
+        plan_id=plan_id,
+        result=plan_data["result"],
     )
+    return HTMLResponse(html)
 
 
 @router.get("/dashboard/{plan_id}", response_class=HTMLResponse)
 async def dashboard(request: Request, plan_id: str):
     plan_data = plans.get(plan_id)
     if not plan_data:
-        return templates.TemplateResponse(
-            "index.html", {"request": request, "error": "Plan not found"}
-        )
-    return templates.TemplateResponse(
+        html = render("index.html", request=request, error="Plan not found")
+        return HTMLResponse(html)
+    html = render(
         "dashboard.html",
-        {
-            "request": request,
-            "plan_id": plan_id,
-            "result": plan_data["result"],
-        },
+        request=request,
+        plan_id=plan_id,
+        result=plan_data["result"],
     )
+    return HTMLResponse(html)
