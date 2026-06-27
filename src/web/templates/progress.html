@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正在规划中 - 旅游助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-50 min-h-screen">
+    <nav class="bg-white/80 backdrop-blur border-b border-blue-100">
+        <div class="max-w-2xl mx-auto px-6 py-4">
+            <a href="/" class="text-xl font-bold text-blue-600">🌍 旅游助手</a>
+        </div>
+    </nav>
+
+    <main class="max-w-2xl mx-auto px-6 py-12">
+        <div class="bg-white rounded-2xl shadow-lg p-8 text-center">
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">
+                正在为你规划 <span class="text-blue-600">{{ destination }}</span> 之旅
+            </h1>
+            <p class="text-gray-500 mb-8">{{ days }} 天行程 · ¥{{ "%.0f"|format(budget) }} 预算</p>
+
+            <div class="w-full bg-gray-100 rounded-full h-3 mb-8 overflow-hidden">
+                <div id="progress-bar" class="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-700 ease-out" style="width: 0%"></div>
+            </div>
+
+            <div id="status-area" class="min-h-[120px] flex flex-col items-center justify-center">
+                <div id="stage-icon" class="text-4xl mb-4">🌏</div>
+                <p id="stage-message" class="text-lg text-gray-700 font-medium">准备就绪，即将开始规划…</p>
+                <p id="soothing-text" class="text-sm text-gray-400 mt-3 italic">好的规划值得耐心等待 ✨</p>
+            </div>
+
+            <div id="stage-log" class="mt-8 text-left space-y-2 max-h-[200px] overflow-y-auto"></div>
+        </div>
+    </main>
+
+    <script>
+        const stages = {
+            guide:     { icon: "🌏", label: "导游规划路线" },
+            foodie:    { icon: "🍜", label: "美食家推荐美食" },
+            local:     { icon: "🏘️", label: "本地通挖掘宝藏" },
+            finance:   { icon: "💰", label: "财务官精打细算" },
+            synthesizing: { icon: "🧠", label: "主持人综合整理" },
+            done:      { icon: "✅", label: "规划完成！" },
+        };
+
+        const soothing = [
+            "好的规划值得耐心等待 ✨",
+            "几位旅行专家正在热烈讨论中…",
+            "深呼吸，美好的旅程即将呈现 🌿",
+            "导游正在翻阅当地攻略…",
+            "美食家正在流连于各大食肆之间 😋",
+            "本地通发现了几个小众秘境 🤫",
+            "财务官正在帮你省钱 💪",
+            "马上就好，再等一下下…",
+        ];
+
+        const evtSource = new EventSource("/plan/{{ plan_id }}/progress");
+        let logContainer = document.getElementById("stage-log");
+        let soothingIdx = 1;
+
+        evtSource.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+
+            if (data.done) {
+                document.getElementById("stage-icon").textContent = "✅";
+                document.getElementById("stage-message").textContent = "行程规划完成！";
+                document.getElementById("soothing-text").textContent = "即将跳转到行程详情…";
+                document.getElementById("progress-bar").style.width = "100%";
+                evtSource.close();
+                setTimeout(() => {
+                    window.location.href = "/plan/" + data.plan_id;
+                }, 1500);
+                return;
+            }
+
+            const s = stages[data.stage] || { icon: "⏳", label: data.stage };
+
+            document.getElementById("progress-bar").style.width = data.pct + "%";
+            document.getElementById("stage-icon").textContent = s.icon;
+            document.getElementById("stage-message").textContent = data.message;
+
+            if (soothingIdx < soothing.length) {
+                document.getElementById("soothing-text").textContent =
+                    soothing[soothingIdx % soothing.length];
+                soothingIdx++;
+            }
+
+            const log = document.createElement("div");
+            log.className = "flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2";
+            log.innerHTML = `<span>${s.icon}</span> <span>${data.message}</span>`;
+            logContainer.appendChild(log);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        };
+
+        evtSource.onerror = function() {
+            document.getElementById("stage-message").textContent = "连接中断，正在重试…";
+        };
+    </script>
+</body>
+</html>

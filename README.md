@@ -94,17 +94,19 @@ easyPi/
 │   ├── config.py            # 火山引擎配置
 │   ├── models/
 │   │   └── itinerary.py     # Pydantic 输出模型
+│   ├── progress.py          # SSE 进度跟踪
 │   ├── agents/
-│   │   ├── moderator.py     # 主持人 agent
+│   │   ├── moderator.py     # 主持人 agent + 编排逻辑
 │   │   ├── guide.py         # 导游
 │   │   ├── foodie.py        # 美食家
 │   │   ├── local_expert.py  # 本地通
 │   │   └── finance.py       # 财务官
 │   └── web/
-│       ├── routes.py        # FastAPI 路由
+│       ├── routes.py        # FastAPI 路由（含 SSE）
 │       └── templates/
 │           ├── base.html
 │           ├── index.html      # 输入表单
+│           ├── progress.html   # 进度页（进度条+安慰话术）
 │           ├── plan.html       # 讨论+行程
 │           └── dashboard.html  # 看板视图
 └── docs/superpowers/
@@ -117,9 +119,19 @@ easyPi/
 | 路由 | 方法 | 说明 |
 |------|------|------|
 | `/` | GET | 输入表单 |
-| `/plan` | POST | 提交需求，生成行程 |
+| `/plan` | POST | 提交需求，进入进度页，后台异步生成行程 |
 | `/plan/{id}` | GET | 查看行程详情 |
+| `/plan/{id}/progress` | GET | SSE 实时进度流 |
 | `/dashboard/{id}` | GET | 看板视图 |
+
+## 用户体验
+
+生成行程时，页面通过 SSE (Server-Sent Events) 实时展示：
+
+1. **进度条** — 直观显示整体完成度
+2. **阶段提示** — 当前哪位专家在思考（导游/美食家/本地通/财务官/主持人）
+3. **安慰话术** — 等待过程中随机显示温柔提示
+4. **讨论日志** — 实时追加每位专家的思考结果
 
 ## 测试
 
