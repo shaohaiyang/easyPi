@@ -3,6 +3,7 @@ import json
 import uuid
 from pathlib import Path
 
+import markdown as md_lib
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from jinja2 import Environment, FileSystemLoader
@@ -14,6 +15,13 @@ router = APIRouter()
 
 TEMPLATE_DIR = str(Path(__file__).parent / "templates")
 env = Environment(loader=FileSystemLoader(TEMPLATE_DIR), auto_reload=True)
+
+
+def render_markdown(text: str) -> str:
+    return md_lib.markdown(text, extensions=["fenced_code", "tables", "nl2br"])
+
+
+env.filters["markdown"] = render_markdown
 
 plans: dict[str, dict] = {}
 _background_tasks: set[asyncio.Task] = set()
@@ -37,11 +45,12 @@ async def start_plan(
     days: int = Form(...),
     budget: float = Form(...),
     interests: str = Form(""),
+    language: str = Form("zh"),
 ):
     plan_id = uuid.uuid4().hex[:8]
 
     task = asyncio.create_task(
-        _run_plan(plan_id, destination, days, budget, interests)
+        _run_plan(plan_id, destination, days, budget, interests, language)
     )
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
@@ -59,14 +68,16 @@ async def start_plan(
 
 
 async def _run_plan(
-    plan_id: str, destination: str, days: int, budget: float, interests: str
+    plan_id: str, destination: str, days: int, budget: float, interests: str,
+    language: str = "zh",
 ):
     tracker = get_tracker(plan_id)
-    result = await create_plan(destination, days, budget, interests, tracker)
+    result = await create_plan(destination, days, budget, interests, tracker, language)
     plans[plan_id] = {
         "destination": destination,
         "days": days,
         "budget": budget,
+        "language": language,
         "result": result,
     }
 
@@ -76,13 +87,13 @@ async def plan_progress(request: Request, plan_id: str):
     tracker = get_tracker(plan_id)
 
     async def event_generator():
-        # 不设总超时，改为"无进度空闲超时"：120 秒无任何进度事件则判定超时
+        # 不设总超时，改为"无进度空闲超时"：600 秒无任何进度事件则判定超时
         # 每次 tracker._event 被 set 都会重置这个计时器
         while not tracker.done:
             try:
-                await asyncio.wait_for(tracker._event.wait(), timeout=120)
+                await asyncio.wait_for(tracker._event.wait(), timeout=600)
             except asyncio.TimeoutError:
-                yield f"data: {json.dumps({'failed': True, 'error': 'LLM 响应超时（120 秒无响应），请重试'})}\n\n"
+                yield f"data: {json.dumps({'failed': True, 'error': 'LLM 响应超时（600 秒无响应），请重试'})}\n\n"
                 return
 
             tracker._event.clear()

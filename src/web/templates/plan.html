@@ -41,7 +41,7 @@
                     <div class="text-xs text-green-500">总预算</div>
                 </div>
             </div>
-            <p class="text-gray-600 mt-4 leading-relaxed">{{ result.itinerary.summary }}</p>
+            <div class="text-gray-600 mt-4 leading-relaxed markdown-content">{{ result.itinerary.summary | markdown | safe }}</div>
         </div>
 
         <!-- 每日行程 -->

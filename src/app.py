@@ -13,7 +13,7 @@ app.include_router(router)
 
 
 def main():
-    uvicorn.run("src.app:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("src.app:app", host="0.0.0.0", port=8888, reload=True)
 
 
 if __name__ == "__main__":

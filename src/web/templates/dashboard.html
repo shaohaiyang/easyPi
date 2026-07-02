@@ -82,7 +82,7 @@
             {% for entry in result.discussion %}
             <div class="border-l-3 border-gray-200 pl-4 py-2">
                 <div class="text-sm font-semibold text-blue-600 mb-1">{{ entry.agent_name }}</div>
-                <div class="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{{ entry.content }}</div>
+                <div class="text-sm text-gray-600 leading-relaxed markdown-content">{{ entry.content | markdown | safe }}</div>
             </div>
             {% endfor %}
         </div>

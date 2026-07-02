@@ -28,7 +28,7 @@ class ProgressTracker:
         self.done = True
         self._event.set()
 
-    def add_stage_result(self, agent: str, content: list | dict):
+    def add_stage_result(self, agent: str, content: str | list | dict):
         self.stages.append({"agent": agent, "content": content})
 
 

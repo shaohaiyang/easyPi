@@ -9,5 +9,4 @@ VOLC_BASE_URL = os.getenv(
     "https://ark.cn-beijing.volces.com/api/coding/v3",
 )
 
-DEEPSEEK_MODEL = "deepseek-v4-flash-260425"
-GLM_MODEL_NAME = "glm-4-7-251222"
+MODEL_NAME = os.getenv("MODEL_NAME") or "deepseek-v4-flash-260425"
