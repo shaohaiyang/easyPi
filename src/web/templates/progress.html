@@ -96,6 +96,7 @@
         const logContainer = document.getElementById("stage-log");
         let soothingIdx = 0;
         let done = false;
+        let lastLoggedStage = "";
 
         // 空闲超时：LLM 正在思考时不打断，但 30 秒无进度给个温柔提示
         let stallWarnTimer = setTimeout(() => {
@@ -196,10 +197,13 @@
                 soothing[soothingIdx % soothing.length];
             soothingIdx++;
 
-            const log = document.createElement("div");
-            log.className = "flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2";
-            log.innerHTML = `<span>${s.icon}</span> <span>${data.message}</span>`;
-            logContainer.appendChild(log);
+            if (data.stage !== lastLoggedStage) {
+                const log = document.createElement("div");
+                log.className = "flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2";
+                log.innerHTML = `<span>${data.message}</span>`;
+                logContainer.appendChild(log);
+                lastLoggedStage = data.stage;
+            }
             logContainer.scrollTop = logContainer.scrollHeight;
         };
 
